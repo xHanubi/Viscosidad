@@ -1,0 +1,61 @@
+! Rutina en SPARCv8/4 para calcular posiciones del carro
+
+.section ".text"
+.global calcular_posiciones
+
+calcular_posiciones:
+    ! %o0 = dirección de la lista de velocidades
+    ! %o1 = cantidad de elementos
+    ! %o2 = dirección de la lista de posiciones
+    save %sp, -96, %sp
+    
+    mov 0, %l0  ! x = 0
+    mov 0, %l1  ! y = 0
+    mov 0, %l2  ! theta = 0 (ángulo en radianes, aproximado como entero)
+    mov 10, %l3 ! dt = 0.1 (factor de escala para evitar coma flotante)
+    mov 1, %l4  ! L = 1 (distancia entre ruedas)
+    
+    mov %i1, %l5  ! Copiar cantidad de elementos
+    mov %i0, %l6  ! Copiar dirección de la lista de velocidades
+    mov %i2, %l7  ! Copiar dirección de la lista de posiciones
+    
+loop:
+    cmp %l5, 0
+    be end
+    nop
+    
+    ld [%l6], %l8   ! Cargar v_l
+    ld [%l6 + 4], %l9 ! Cargar v_r
+    add %l6, 8, %l6  ! Avanzar al siguiente par de velocidades
+    
+    add %l8, %l9, %l10   ! v = (v_l + v_r)
+    sra %l10, 1, %l10    ! v /= 2
+    sub %l9, %l8, %l11   ! omega = (v_r - v_l)
+    
+    ! Calcular nuevos x, y (sin coma flotante, usando dt como factor de escala)
+    smul %l10, %l3, %l12 ! v * dt
+    call cos
+    mov %l2, %o0  ! cos(theta)
+    smul %o0, %l12, %l13 ! x += v * cos(theta) * dt
+    add %l0, %l13, %l0
+    
+    call sin
+    mov %l2, %o0  ! sin(theta)
+    smul %o0, %l12, %l14 ! y += v * sin(theta) * dt
+    add %l1, %l14, %l1
+    
+    smul %l11, %l3, %l15 ! omega * dt
+    add %l2, %l15, %l2   ! theta += omega * dt
+    
+    ! Almacenar x, y en memoria
+    st %l0, [%l7]
+    st %l1, [%l7 + 4]
+    add %l7, 8, %l7  ! Avanzar en la lista de posiciones
+    
+    dec %l5
+    ba loop
+    nop
+    
+end:
+    ret
+    restore
